@@ -74,6 +74,21 @@ async function isTrackedUrl(url) {
   return settings.extraSites.length > 0 && matchesExtraSite(url, settings.extraSites);
 }
 
+async function broadcastOverlayUpdate() {
+  if (trackedTabId === null) return;
+  try {
+    const settings = await getSettings();
+    const usage = await getUsage();
+    const used = await usedSeconds(usage);
+    await browser.tabs.sendMessage(trackedTabId, {
+      type: "limitStatusUpdate",
+      limit: settings.shortsLimitSeconds,
+      used
+    });
+  } catch (e) {
+  }
+}
+
 function buildBlockPageUrl(remainingSeconds) {
   return browser.runtime.getURL("blockpage.html") + "?remaining=" + encodeURIComponent(Math.ceil(remainingSeconds));
 }
@@ -138,6 +153,7 @@ async function tick() {
   const usage = await getUsage();
   recordEvent(usage, elapsed);
   await saveUsage(usage);
+  await broadcastOverlayUpdate();
 
   const settings = await getSettings();
   const used = await usedSeconds(usage);
@@ -170,6 +186,16 @@ async function injectVisibilityReporter(tabId) {
   }
 }
 
+async function injectOverlay(tabId) {
+  try {
+    await browser.tabs.executeScript(tabId, {
+      file: "usage-overlay.js",
+      runAt: "document_idle"
+    });
+  } catch (e) {
+  }
+}
+
 async function startTracking(tabId, isShorts) {
   if (trackedTabId !== null && trackedTabId !== tabId) {
     await tick();
@@ -182,6 +208,8 @@ async function startTracking(tabId, isShorts) {
   if (!isShorts) {
     await injectVisibilityReporter(tabId);
   }
+  await injectOverlay(tabId);
+  await broadcastOverlayUpdate();
   startTicking();
 }
 
@@ -205,6 +233,8 @@ async function onNavigation(details) {
     if (await checkAndEnforce(details.tabId)) return;
     if (trackedTabId !== details.tabId) {
       await startTracking(details.tabId, isShortsUrl(url));
+    } else {
+      await broadcastOverlayUpdate();
     }
     return;
   }
@@ -251,9 +281,11 @@ browser.tabs.onRemoved.addListener(tabId => {
   blockedTabIds.delete(tabId);
 });
 
-browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (changeInfo.status === "complete" && trackedTabId === tabId) {
     trackedActiveSince = Date.now();
+    await injectOverlay(tabId);
+    await broadcastOverlayUpdate();
   }
   if (changeInfo.url) {
     onNavigation({ tabId, url: changeInfo.url, frameId: 0 });
@@ -292,7 +324,8 @@ browser.runtime.onMessage.addListener(async message => {
     return {
       limit: settings.shortsLimitSeconds,
       used,
-      remaining: Math.max(0, settings.shortsLimitSeconds - used)
+      remaining: Math.max(0, settings.shortsLimitSeconds - used),
+      tracked: trackedTabId !== null
     };
   }
   if (message && message.type === "resetUsage") {
