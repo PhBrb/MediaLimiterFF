@@ -8,9 +8,11 @@ const ROLLING_WINDOW_MS = 60 * 60 * 1000;
 const SHORTS_URL_PATTERN = /^https:\/\/(www\.|m\.)?youtube\.com\/(shorts|live\/shorts)/i;
 
 let trackedTabId = null;
+let trackedIsShorts = false;
 let trackedActiveSince = 0;
 let trackedVisible = true;
 let tickTimer = null;
+let pendingBlockTabId = null;
 let blockedTabIds = new Set();
 
 async function getSettings() {
@@ -140,14 +142,19 @@ async function tick() {
   const settings = await getSettings();
   const used = await usedSeconds(usage);
   if (used >= settings.shortsLimitSeconds) {
-    const tabId = trackedTabId;
-    stopTracking();
-    await blockTab(tabId, settings.shortsLimitSeconds - used);
+    if (trackedIsShorts) {
+      pendingBlockTabId = trackedTabId;
+    } else {
+      const tabId = trackedTabId;
+      stopTracking();
+      await blockTab(tabId, settings.shortsLimitSeconds - used);
+    }
   }
 }
 
 function stopTracking() {
   trackedTabId = null;
+  trackedIsShorts = false;
   trackedActiveSince = 0;
   trackedVisible = true;
   stopTickingIfIdle();
@@ -163,15 +170,16 @@ async function injectVisibilityReporter(tabId) {
   }
 }
 
-async function startTracking(tabId, injectReporter) {
+async function startTracking(tabId, isShorts) {
   if (trackedTabId !== null && trackedTabId !== tabId) {
     await tick();
     stopTracking();
   }
   trackedTabId = tabId;
+  trackedIsShorts = isShorts;
   trackedVisible = true;
   trackedActiveSince = Date.now();
-  if (injectReporter) {
+  if (!isShorts) {
     await injectVisibilityReporter(tabId);
   }
   startTicking();
@@ -182,12 +190,21 @@ async function onNavigation(details) {
 
   if (details.frameId !== 0) return;
 
+  if (pendingBlockTabId === details.tabId && isShortsUrl(url)) {
+    const tabId = pendingBlockTabId;
+    pendingBlockTabId = null;
+    const settings = await getSettings();
+    const usage = await getUsage();
+    const used = await usedSeconds(usage);
+    stopTracking();
+    await blockTab(tabId, settings.shortsLimitSeconds - used);
+    return;
+  }
+
   if (await isTrackedUrl(url)) {
     if (await checkAndEnforce(details.tabId)) return;
     if (trackedTabId !== details.tabId) {
-      const settings = await getSettings();
-      const needsInjection = !isShortsUrl(url);
-      await startTracking(details.tabId, needsInjection);
+      await startTracking(details.tabId, isShortsUrl(url));
     }
     return;
   }
@@ -205,8 +222,7 @@ async function syncTrackingWithActiveTab() {
     const tab = tabs[0];
     if (await isTrackedUrl(tab.url)) {
       if (trackedTabId !== tab.id) {
-        const needsInjection = !isShortsUrl(tab.url);
-        await startTracking(tab.id, needsInjection);
+        await startTracking(tab.id, isShortsUrl(tab.url));
       }
     } else if (trackedTabId === tab.id) {
       await tick();
@@ -228,6 +244,9 @@ browser.windows.onFocusChanged.addListener(async windowId => {
 browser.tabs.onRemoved.addListener(tabId => {
   if (trackedTabId === tabId) {
     stopTracking();
+  }
+  if (pendingBlockTabId === tabId) {
+    pendingBlockTabId = null;
   }
   blockedTabIds.delete(tabId);
 });
