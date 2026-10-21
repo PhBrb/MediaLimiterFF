@@ -5,7 +5,6 @@ const DEFAULT_SETTINGS = {
 };
 
 const limitInput = document.getElementById("limitMinutes");
-const siteCostDisplay = document.getElementById("siteCostDisplay");
 const newSiteInput = document.getElementById("newSite");
 const addSiteButton = document.getElementById("addSite");
 const siteList = document.getElementById("siteList");
@@ -119,7 +118,6 @@ async function init() {
   const stored = await browser.storage.local.get("settings");
   settings = { ...DEFAULT_SETTINGS, ...(stored.settings || {}) };
   limitInput.value = formatMinutes(settings.shortsLimitSeconds);
-  siteCostDisplay.textContent = settings.siteCostSeconds;
   renderSiteList();
   await refreshUsage();
   setInterval(refreshUsage, 5000);
