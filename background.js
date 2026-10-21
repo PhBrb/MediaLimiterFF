@@ -190,7 +190,7 @@ async function injectOverlay(tabId) {
   try {
     await browser.tabs.executeScript(tabId, {
       file: "usage-overlay.js",
-      runAt: "document_start"
+      runAt: "document_idle"
     });
   } catch (e) {
   }
@@ -281,9 +281,11 @@ browser.tabs.onRemoved.addListener(tabId => {
   blockedTabIds.delete(tabId);
 });
 
-browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (changeInfo.status === "complete" && trackedTabId === tabId) {
     trackedActiveSince = Date.now();
+    await injectOverlay(tabId);
+    await broadcastOverlayUpdate();
   }
   if (changeInfo.url) {
     onNavigation({ tabId, url: changeInfo.url, frameId: 0 });
