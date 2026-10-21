@@ -107,7 +107,7 @@ async function tick() {
     return;
   }
   const now = Date.now();
-  const elapsed = (now - shortsActiveSince) / 1000;
+  const elapsed = Math.min((now - shortsActiveSince) / 1000, 60);
   shortsActiveSince = now;
   if (elapsed <= 0) return;
 
@@ -121,6 +121,28 @@ async function tick() {
     const tabId = activeShortsTabId;
     stopShortsTracking();
     await blockTab(tabId, settings.shortsLimitSeconds - used);
+  }
+}
+
+async function syncTrackingWithActiveTab() {
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tabs.length === 0) return;
+    const tab = tabs[0];
+    if (isShortsUrl(tab.url)) {
+      if (activeShortsTabId !== tab.id) {
+        if (activeShortsTabId !== null) {
+          await tick();
+        }
+        activeShortsTabId = tab.id;
+        shortsActiveSince = Date.now();
+        startTicking();
+      }
+    } else if (activeShortsTabId === tab.id) {
+      await tick();
+      stopShortsTracking();
+    }
+  } catch (e) {
   }
 }
 
@@ -179,6 +201,10 @@ async function onNavigation(details) {
 
 browser.webNavigation.onCommitted.addListener(onNavigation);
 
+browser.webNavigation.onHistoryStateUpdated.addListener(onNavigation);
+
+browser.windows.onFocusChanged.addListener(syncTrackingWithActiveTab);
+
 browser.tabs.onRemoved.addListener(tabId => {
   if (activeShortsTabId === tabId) {
     stopShortsTracking();
@@ -190,6 +216,9 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (activeShortsTabId === tabId && changeInfo.status === "complete") {
     shortsActiveSince = Date.now();
   }
+  if (changeInfo.url) {
+    onNavigation({ tabId, url: changeInfo.url, frameId: 0 });
+  }
 });
 
 browser.tabs.onActivated.addListener(async activeInfo => {
@@ -197,7 +226,10 @@ browser.tabs.onActivated.addListener(async activeInfo => {
     await tick();
     stopShortsTracking();
   }
+  await syncTrackingWithActiveTab();
 });
+
+syncTrackingWithActiveTab();
 
 browser.runtime.onMessage.addListener(async message => {
   if (message && message.type === "getLimitStatus") {
