@@ -102,8 +102,20 @@ function stopTickingIfIdle() {
   }
 }
 
+async function isShortsForeground(tabId) {
+  if (!shortsVisible) return false;
+  try {
+    const tab = await browser.tabs.get(tabId);
+    if (!tab.active) return false;
+    const win = await browser.windows.get(tab.windowId);
+    return win.focused;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function tick() {
-  if (activeShortsTabId === null || !shortsVisible) {
+  if (activeShortsTabId === null) {
     stopTickingIfIdle();
     return;
   }
@@ -111,6 +123,8 @@ async function tick() {
   const elapsed = Math.min((now - shortsActiveSince) / 1000, 60);
   shortsActiveSince = now;
   if (elapsed <= 0) return;
+
+  if (!(await isShortsForeground(activeShortsTabId))) return;
 
   const usage = await getUsage();
   recordEvent(usage, elapsed);
@@ -212,7 +226,10 @@ browser.webNavigation.onCommitted.addListener(onNavigation);
 
 browser.webNavigation.onHistoryStateUpdated.addListener(onNavigation);
 
-browser.windows.onFocusChanged.addListener(syncTrackingWithActiveTab);
+browser.windows.onFocusChanged.addListener(async windowId => {
+  shortsActiveSince = Date.now();
+  await syncTrackingWithActiveTab();
+});
 
 browser.tabs.onRemoved.addListener(tabId => {
   if (activeShortsTabId === tabId) {

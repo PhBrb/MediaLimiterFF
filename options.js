@@ -115,6 +115,7 @@ resetUsageButton.addEventListener("click", async () => {
 });
 
 async function init() {
+  document.getElementById("version").textContent = "Version " + browser.runtime.getManifest().version;
   const stored = await browser.storage.local.get("settings");
   settings = { ...DEFAULT_SETTINGS, ...(stored.settings || {}) };
   limitInput.value = formatMinutes(settings.shortsLimitSeconds);
