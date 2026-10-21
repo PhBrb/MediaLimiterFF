@@ -1,6 +1,6 @@
 function reportVisibility() {
   browser.runtime.sendMessage({
-    type: "shortsVisibility",
+    type: "pageVisibility",
     visible: !document.hidden
   }).catch(() => {});
 }
