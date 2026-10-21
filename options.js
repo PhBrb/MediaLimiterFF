@@ -63,6 +63,7 @@ async function renderSiteList() {
   const shortsItem = document.createElement("li");
   const shortsLabel = document.createElement("span");
   shortsLabel.textContent = "YouTube Shorts";
+  shortsLabel.style.fontWeight = "bold";
   const shortsTag = document.createElement("span");
   shortsTag.className = "fixed-tag";
   shortsTag.textContent = "always included";

@@ -21,7 +21,7 @@ A Firefox for Android (Gecko) WebExtension that limits media consumption.
 
 Open the extension's options page (Add-ons → MediaLimiter → Settings):
 
-- **YouTube Shorts limit (minutes)**: total Shorts time allowed per rolling hour (default 10).
+- **Time limit per hour (minutes)**: total time allowed per rolling hour (default 10). Applies to YouTube Shorts and all listed websites.
 - **Additional websites**: list of domains; viewing time on them counts against the limit (paused when hidden/minimized, like Shorts).
 - **Current usage**: live view of the used time in the current rolling window, plus a reset button.
 
