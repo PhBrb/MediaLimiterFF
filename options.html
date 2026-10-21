@@ -11,15 +11,14 @@
   <p class="hint" id="version"></p>
 
   <section>
-    <h2>Time limit per rolling hour</h2>
-    <label for="limitMinutes">YouTube Shorts limit (minutes)</label>
+    <h2>Time limit per hour</h2>
     <input type="number" id="limitMinutes" min="1" max="60" step="1" inputmode="numeric">
     <p class="hint">Default: 10 minutes. The limit applies to a rolling 60-minute window.</p>
   </section>
 
   <section>
-    <h2>Additional websites</h2>
-    <p class="hint">Time spent viewing a listed website is counted against the same time limit (paused when the tab is hidden or the window is minimized, same as YouTube Shorts).</p>
+    <h2>Websites</h2>
+    <p class="hint">Time spent viewing a listed website is counted against the same time limit (paused when the tab is hidden or the window is minimized).</p>
     <label for="newSite">Add website</label>
     <div class="add-row">
       <input type="text" id="newSite" placeholder="example.com">
