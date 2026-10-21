@@ -8,6 +8,7 @@ const ROLLING_WINDOW_MS = 60 * 60 * 1000;
 const SHORTS_URL_PATTERN = /^https:\/\/(www\.|m\.)?youtube\.com\/(shorts|live\/shorts)/i;
 let activeShortsTabId = null;
 let shortsActiveSince = 0;
+let shortsVisible = true;
 let tickTimer = null;
 let blockedTabIds = new Set();
 
@@ -101,6 +102,18 @@ function stopTickingIfIdle() {
   }
 }
 
+async function isShortsForeground(tabId) {
+  if (!shortsVisible) return false;
+  try {
+    const tab = await browser.tabs.get(tabId);
+    if (!tab.active) return false;
+    const win = await browser.windows.get(tab.windowId);
+    return win.focused;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function tick() {
   if (activeShortsTabId === null) {
     stopTickingIfIdle();
@@ -110,6 +123,8 @@ async function tick() {
   const elapsed = Math.min((now - shortsActiveSince) / 1000, 60);
   shortsActiveSince = now;
   if (elapsed <= 0) return;
+
+  if (!(await isShortsForeground(activeShortsTabId))) return;
 
   const usage = await getUsage();
   recordEvent(usage, elapsed);
@@ -135,6 +150,7 @@ async function syncTrackingWithActiveTab() {
           await tick();
         }
         activeShortsTabId = tab.id;
+        shortsVisible = true;
         shortsActiveSince = Date.now();
         startTicking();
       }
@@ -149,6 +165,12 @@ async function syncTrackingWithActiveTab() {
 function stopShortsTracking() {
   activeShortsTabId = null;
   shortsActiveSince = 0;
+  shortsVisible = true;
+  stopTickingIfIdle();
+}
+
+function pauseShortsTracking() {
+  shortsActiveSince = Date.now();
   stopTickingIfIdle();
 }
 
@@ -165,6 +187,7 @@ async function onNavigation(details) {
         await tick();
       }
       activeShortsTabId = details.tabId;
+      shortsVisible = true;
       shortsActiveSince = Date.now();
       startTicking();
     }
@@ -203,7 +226,10 @@ browser.webNavigation.onCommitted.addListener(onNavigation);
 
 browser.webNavigation.onHistoryStateUpdated.addListener(onNavigation);
 
-browser.windows.onFocusChanged.addListener(syncTrackingWithActiveTab);
+browser.windows.onFocusChanged.addListener(async windowId => {
+  shortsActiveSince = Date.now();
+  await syncTrackingWithActiveTab();
+});
 
 browser.tabs.onRemoved.addListener(tabId => {
   if (activeShortsTabId === tabId) {
@@ -232,6 +258,21 @@ browser.tabs.onActivated.addListener(async activeInfo => {
 syncTrackingWithActiveTab();
 
 browser.runtime.onMessage.addListener(async message => {
+  if (message && message.type === "shortsVisibility") {
+    if (activeShortsTabId === null) return;
+    if (message.visible) {
+      if (!shortsVisible) {
+        shortsVisible = true;
+        shortsActiveSince = Date.now();
+        startTicking();
+      }
+    } else if (shortsVisible) {
+      await tick();
+      shortsVisible = false;
+      pauseShortsTracking();
+    }
+    return;
+  }
   if (message && message.type === "getLimitStatus") {
     const settings = await getSettings();
     const usage = await getUsage();
