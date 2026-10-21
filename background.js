@@ -74,15 +74,20 @@ async function isTrackedUrl(url) {
   return settings.extraSites.length > 0 && matchesExtraSite(url, settings.extraSites);
 }
 
-async function broadcastOverlayUpdate() {
+async function broadcastOverlayUpdate(status) {
   if (trackedTabId === null) return;
   try {
-    const settings = await getSettings();
-    const usage = await getUsage();
-    const used = await usedSeconds(usage);
+    let limit = status && status.limit;
+    let used = status && status.used;
+    if (limit === undefined || used === undefined) {
+      const settings = await getSettings();
+      const usage = await getUsage();
+      limit = settings.shortsLimitSeconds;
+      used = await usedSeconds(usage);
+    }
     await browser.tabs.sendMessage(trackedTabId, {
       type: "limitStatusUpdate",
-      limit: settings.shortsLimitSeconds,
+      limit,
       used
     });
   } catch (e) {
@@ -150,13 +155,12 @@ async function tick() {
 
   if (!(await isTabForeground(trackedTabId))) return;
 
+  const settings = await getSettings();
   const usage = await getUsage();
+  const used = (await usedSeconds(usage)) + elapsed;
   recordEvent(usage, elapsed);
   await saveUsage(usage);
-  await broadcastOverlayUpdate();
 
-  const settings = await getSettings();
-  const used = await usedSeconds(usage);
   if (used >= settings.shortsLimitSeconds) {
     if (trackedIsShorts) {
       pendingBlockTabId = trackedTabId;
@@ -165,7 +169,9 @@ async function tick() {
       stopTracking();
       await blockTab(tabId, settings.shortsLimitSeconds - used);
     }
+    return;
   }
+  await broadcastOverlayUpdate({ limit: settings.shortsLimitSeconds, used });
 }
 
 function stopTracking() {
