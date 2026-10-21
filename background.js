@@ -94,8 +94,8 @@ async function broadcastOverlayUpdate(status) {
   }
 }
 
-function buildBlockPageUrl(remainingSeconds) {
-  return browser.runtime.getURL("blockpage.html") + "?remaining=" + encodeURIComponent(Math.ceil(remainingSeconds));
+function buildBlockPageUrl() {
+  return browser.runtime.getURL("blockpage.html");
 }
 
 async function checkAndEnforce(tabId) {
@@ -104,16 +104,16 @@ async function checkAndEnforce(tabId) {
   const used = await usedSeconds(usage);
   const limit = settings.shortsLimitSeconds;
   if (used >= limit) {
-    await blockTab(tabId, limit - used);
+    await blockTab(tabId);
     return true;
   }
   return false;
 }
 
-async function blockTab(tabId, remainingSeconds) {
+async function blockTab(tabId) {
   blockedTabIds.add(tabId);
   try {
-    await browser.tabs.update(tabId, { url: buildBlockPageUrl(remainingSeconds) });
+    await browser.tabs.update(tabId, { url: buildBlockPageUrl() });
   } catch (e) {
   }
 }
@@ -167,7 +167,7 @@ async function tick() {
     } else {
       const tabId = trackedTabId;
       stopTracking();
-      await blockTab(tabId, settings.shortsLimitSeconds - used);
+      await blockTab(tabId);
     }
     return;
   }
@@ -231,7 +231,7 @@ async function onNavigation(details) {
     const usage = await getUsage();
     const used = await usedSeconds(usage);
     stopTracking();
-    await blockTab(tabId, settings.shortsLimitSeconds - used);
+    await blockTab(tabId);
     return;
   }
 

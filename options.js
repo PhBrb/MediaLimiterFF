@@ -59,6 +59,17 @@ async function saveSettings() {
 
 async function renderSiteList() {
   siteList.innerHTML = "";
+
+  const shortsItem = document.createElement("li");
+  const shortsLabel = document.createElement("span");
+  shortsLabel.textContent = "YouTube Shorts";
+  const shortsTag = document.createElement("span");
+  shortsTag.className = "fixed-tag";
+  shortsTag.textContent = "always included";
+  shortsItem.appendChild(shortsLabel);
+  shortsItem.appendChild(shortsTag);
+  siteList.appendChild(shortsItem);
+
   for (const site of settings.extraSites) {
     const li = document.createElement("li");
     const span = document.createElement("span");

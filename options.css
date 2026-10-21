@@ -51,6 +51,12 @@ ul li {
   padding: 0.5rem 0;
 }
 
+.fixed-tag {
+  color: #555;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
 .hint {
   color: #555;
   font-size: 0.9rem;

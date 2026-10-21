@@ -7,8 +7,9 @@ A Firefox for Android (Gecko) WebExtension that limits media consumption.
 - **YouTube Shorts limiting**: while a tab is on a YouTube Shorts page (`youtube.com/shorts/...`), usage time is tracked each second. Normal YouTube videos are not affected.
 - **Rolling window**: usage is measured over a rolling 60-minute window with a default limit of 10 minutes per hour.
 - **Configurable limit**: the Shorts time limit can be changed (1–60 minutes) in the settings.
+- **Usage overlay**: a thin red loading bar is shown at the very top of tracked pages, filling up as the time limit is used. It stays visible while swiping through Shorts.
 - **Extra websites**: additional websites can be added in the settings. Time spent viewing a listed site is counted against the same time limit, paused when hidden or minimized.
-- **Block page**: when the limit is exhausted, the Shorts tab (or the visited site) is redirected to an explanation page. Time becomes available again as older usage expires from the rolling window.
+- **Block page**: when the limit is exhausted, a Shorts tab is redirected to an explanation page on the next swipe to another Short; visits to other listed sites are blocked immediately. Time becomes available again as older usage expires from the rolling window.
 
 ## Install (Firefox for Android)
 
