@@ -8,6 +8,7 @@ const ROLLING_WINDOW_MS = 60 * 60 * 1000;
 const SHORTS_URL_PATTERN = /^https:\/\/(www\.|m\.)?youtube\.com\/(shorts|live\/shorts)/i;
 let activeShortsTabId = null;
 let shortsActiveSince = 0;
+let shortsVisible = true;
 let tickTimer = null;
 let blockedTabIds = new Set();
 
@@ -102,7 +103,7 @@ function stopTickingIfIdle() {
 }
 
 async function tick() {
-  if (activeShortsTabId === null) {
+  if (activeShortsTabId === null || !shortsVisible) {
     stopTickingIfIdle();
     return;
   }
@@ -135,6 +136,7 @@ async function syncTrackingWithActiveTab() {
           await tick();
         }
         activeShortsTabId = tab.id;
+        shortsVisible = true;
         shortsActiveSince = Date.now();
         startTicking();
       }
@@ -149,6 +151,12 @@ async function syncTrackingWithActiveTab() {
 function stopShortsTracking() {
   activeShortsTabId = null;
   shortsActiveSince = 0;
+  shortsVisible = true;
+  stopTickingIfIdle();
+}
+
+function pauseShortsTracking() {
+  shortsActiveSince = Date.now();
   stopTickingIfIdle();
 }
 
@@ -165,6 +173,7 @@ async function onNavigation(details) {
         await tick();
       }
       activeShortsTabId = details.tabId;
+      shortsVisible = true;
       shortsActiveSince = Date.now();
       startTicking();
     }
@@ -232,6 +241,21 @@ browser.tabs.onActivated.addListener(async activeInfo => {
 syncTrackingWithActiveTab();
 
 browser.runtime.onMessage.addListener(async message => {
+  if (message && message.type === "shortsVisibility") {
+    if (activeShortsTabId === null) return;
+    if (message.visible) {
+      if (!shortsVisible) {
+        shortsVisible = true;
+        shortsActiveSince = Date.now();
+        startTicking();
+      }
+    } else if (shortsVisible) {
+      await tick();
+      shortsVisible = false;
+      pauseShortsTracking();
+    }
+    return;
+  }
   if (message && message.type === "getLimitStatus") {
     const settings = await getSettings();
     const usage = await getUsage();

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MediaLimiter",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Limits YouTube Shorts usage to a configurable time per rolling hour and charges time for visits to custom listed sites.",
   "browser_specific_settings": {
     "gecko": {
@@ -16,6 +16,13 @@
     "page": "options.html",
     "open_in_tab": true
   },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/shorts*"],
+      "js": ["shorts-tracker.js"],
+      "run_at": "document_start"
+    }
+  ],
   "permissions": [
     "storage",
     "tabs",
